@@ -1,0 +1,45 @@
+<!-- 导航栏组件 -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-calendar-check"></i> 设备预约系统
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link <%= currentPage === 'home' ? 'active' : '' %>" href="/">
+                        <i class="fas fa-home"></i> 首页
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <%= currentPage === 'equipment' ? 'active' : '' %>" href="/equipment">
+                        <i class="fas fa-tools"></i> 设备管理
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <%= currentPage === 'new-booking' ? 'active' : '' %>" href="/bookings/new">
+                        <i class="fas fa-plus-circle"></i> 新增预约
+                    </a>
+                </li>
+            </ul>
+            <div class="navbar-nav">
+                <% if (user && user.username) { %>
+                    <span class="nav-item nav-link me-2">
+                        <i class="fas fa-user"></i> <%= user.username %>
+                    </span>
+                    <a class="nav-item nav-link" href="/logout">
+                        <i class="fas fa-sign-out-alt"></i> 退出登录
+                    </a>
+                <% } else { %>
+                    <a class="nav-item nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt"></i> 登录
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</nav>
+    

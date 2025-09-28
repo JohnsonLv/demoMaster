@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国主要城市地图 - 设备预约系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet 地图库 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        /* 设备状态样式 - 与设备管理页面保持一致 */
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .status-available {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-maintenance {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .status-retired {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* 地图容器样式 */
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 6px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        /* 城市列表样式 - 与设备列表样式统一 */
+        .city-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .city-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .city-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .city-item.active {
+            background-color: #e3f2fd;
+            border-left: 4px solid #0d6efd; /* 使用Bootstrap primary颜色 */
+        }
+        
+        /* 按钮样式 - 与设备管理页面统一 */
+        .btn-edit {
+            background-color: #0d6efd;
+            color: white;
+            margin-right: 5px;
+        }
+        
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        /* 地图标记和弹窗样式 */
+        .city-marker {
+            background-color: #0d6efd; /* 使用Bootstrap primary颜色 */
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            text-align: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            border-radius: 6px;
+            padding: 5px;
+        }
+        
+        .popup-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+            color: #0d6efd; /* 使用Bootstrap primary颜色 */
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 - 与设备管理页面完全一致 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-calendar-check"></i> 设备预约系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home"></i> 首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/equipment">
+                            <i class="fas fa-tools"></i> 设备管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/china-map">
+                            <i class="fas fa-map-marked-alt"></i> 城市地图
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/bookings/new">
+                            <i class="fas fa-plus-circle"></i> 新增预约
+                        </a>
+                    </li>
+                </ul>
+                <div class="navbar-nav">
+                    <span class="nav-item nav-link me-2">
+                        <i class="fas fa-user"></i> <%= user.username %>
+                    </span>
+                    <a class="nav-item nav-link" href="/logout">
+                        <i class="fas fa-sign-out-alt"></i> 退出登录
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>中国主要城市地图</h1>
+            <a href="/equipment" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> 返回设备管理
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <!-- 左侧城市列表 - 与设备列表样式统一 -->
+                    <div class="col-md-3 mb-4 mb-md-0">
+                        <div class="card city-list">
+                            <div class="card-header">
+                                <h5>城市列表</h5>
+                            </div>
+                            <div class="list-group list-group-flush" id="cityList">
+                                <div class="list-group-item city-item" data-city="shanghai">
+                                    <strong>上海</strong>
+                                    <div class="text-muted small">华东地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="nanjing">
+                                    <strong>南京</strong>
+                                    <div class="text-muted small">华东地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="shenzhen">
+                                    <strong>深圳</strong>
+                                    <div class="text-muted small">华南地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="ningbo">
+                                    <strong>宁波</strong>
+                                    <div class="text-muted small">华东地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="suzhou">
+                                    <strong>苏州</strong>
+                                    <div class="text-muted small">华东地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="chengdu">
+                                    <strong>成都</strong>
+                                    <div class="text-muted small">西南地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="tianjin">
+                                    <strong>天津</strong>
+                                    <div class="text-muted small">华北地区</div>
+                                </div>
+                                <div class="list-group-item city-item" data-city="changchun">
+                                    <strong>长春</strong>
+                                    <div class="text-muted small">东北地区</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧地图 -->
+                    <div class="col-md-9">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 城市数据 - 包含经纬度和基本信息
+        const cities = {
+            shanghai: {
+                name: "上海",
+                location: [31.230416, 121.473701],
+                region: "华东地区",
+                description: "中国直辖市，国家中心城市，国际经济、金融、贸易、航运、科技创新中心。"
+            },
+            nanjing: {
+                name: "南京",
+                location: [32.060311, 118.796875],
+                region: "华东地区",
+                description: "江苏省省会，副省级市，南京都市圈核心城市，国家重要的科研教育基地和综合交通枢纽。"
+            },
+            shenzhen: {
+                name: "深圳",
+                location: [22.543096, 114.057865],
+                region: "华南地区",
+                description: "广东省副省级市，中国经济特区，国家物流枢纽，国际性综合交通枢纽，国际科技产业创新中心。"
+            },
+            ningbo: {
+                name: "宁波",
+                location: [29.868318, 121.544080],
+                region: "华东地区",
+                description: "浙江省副省级市，计划单列市，长江三角洲南翼经济中心，国家历史文化名城，著名的港口城市。"
+            },
+            suzhou: {
+                name: "苏州",
+                location: [31.299379, 120.619580],
+                region: "华东地区",
+                description: "江苏省地级市，国家历史文化名城，长江三角洲重要的中心城市之一，著名的风景旅游城市。"
+            },
+            chengdu: {
+                name: "成都",
+                location: [30.572269, 104.066541],
+                region: "西南地区",
+                description: "四川省省会，国家中心城市，超大城市，成渝地区双城经济圈核心城市，国家重要的高新技术产业基地。"
+            },
+            tianjin: {
+                name: "天津",
+                location: [39.084158, 117.200983],
+                region: "华北地区",
+                description: "中国直辖市，国家中心城市，超大城市，环渤海地区经济中心，国际性综合交通枢纽。"
+            },
+            changchun: {
+                name: "长春",
+                location: [43.886841, 125.324501],
+                region: "东北地区",
+                description: "吉林省省会，副省级市，东北亚经济圈中心城市，中国重要的工业基地和综合交通枢纽。"
+            }
+        };
+
+        // 等待页面加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化地图，中心点设为中国地理中心附近
+            const map = L.map('map').setView([35.86166, 104.195397], 4);
+            
+            // 添加地图瓦片图层
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 15
+            }).addTo(map);
+            
+            // 创建自定义城市标记图标
+            const createCityMarker = (cityName, size = 30) => {
+                // 创建自定义HTML标记
+                const markerHtml = `<div class="city-marker" style="width: ${size}px; height: ${size}px; line-height: ${size}px;">
+                                    ${cityName.charAt(0)}
+                                   </div>`;
+                                   
+                return L.divIcon({
+                    html: markerHtml,
+                    className: 'custom-city-marker',
+                    iconSize: [size, size],
+                    iconAnchor: [size/2, size/2]
+                });
+            };
+            
+            // 存储所有城市标记
+            const markers = {};
+            
+            // 添加城市标记到地图
+            Object.keys(cities).forEach(cityId => {
+                const city = cities[cityId];
+                const marker = L.marker(city.location, {
+                    icon: createCityMarker(city.name)
+                }).addTo(map);
+                
+                // 绑定弹出窗口
+                marker.bindPopup(`
+                    <div class="popup-title">${city.name}</div>
+                    <div><strong>地区:</strong> ${city.region}</div>
+                    <div><strong>坐标:</strong> ${city.location[0].toFixed(6)}, ${city.location[1].toFixed(6)}</div>
+                    <div class="mt-2">${city.description}</div>
+                `);
+                
+                markers[cityId] = marker;
+            });
+            
+            // 城市列表项点击事件
+            document.querySelectorAll('.city-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const cityId = this.getAttribute('data-city');
+                    const city = cities[cityId];
+                    
+                    if (city) {
+                        // 移除所有项的active类
+                        document.querySelectorAll('.city-item').forEach(el => {
+                            el.classList.remove('active');
+                        });
+                        
+                        // 给当前点击项添加active类
+                        this.classList.add('active');
+                        
+                        // 移动地图到选中城市
+                        map.setView(city.location, 10);
+                        
+                        // 打开弹出窗口
+                        if (markers[cityId]) {
+                            markers[cityId].openPopup();
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+    

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>添加新预约 - 设备预约系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            background-color: white;
+        }
+        .form-title {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .attachment-preview {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+        }
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .attachment-name {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .btn-remove {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 导航栏组件 -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-calendar-check"></i> 设备预约系统
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-home"></i> 首页
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/equipment">
+                        <i class="fas fa-tools"></i> 设备管理
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/china-map">
+                        <i class="fas fa-map-marked-alt"></i> 城市地图
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/bookings/new">
+                        <i class="fas fa-plus-circle"></i> 新增预约
+                    </a>
+                </li>
+            </ul>
+            <div class="navbar-nav">
+                <span class="nav-item nav-link me-2">
+                    <i class="fas fa-user"></i> <%= user.username %>
+                </span>
+                <a class="nav-item nav-link" href="/logout">
+                    <i class="fas fa-sign-out-alt"></i> 退出登录
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+    <div class="container">
+        <div class="form-container">
+            <h2 class="form-title">
+                <i class="bi bi-calendar-plus"></i> 添加新设备预约
+            </h2>
+            
+            <% if (error) { %>
+                <div class="alert alert-danger">
+                    <%= error %>
+                </div>
+            <% } %>
+            
+            <form action="/bookings/add" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="view" value="<%= viewType %>">
+                <input type="hidden" name="date" value="<%= baseDate %>">
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="equipment_id" class="form-label">选择设备 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="equipment_id" name="equipment_id" required>
+                                <option value="">-- 请选择设备 --</option>
+                                <% equipment.forEach(equip => { %>
+                                    <option value="<%= equip.id %>"><%= equip.name %> (<%= equip.type %>)</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="user_name" class="form-label">预约人 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="user_name" name="user_name" 
+                                   placeholder="请输入预约人姓名" required>
+                        </div>
+                    </div> -->
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="start_time" class="form-label">开始时间 <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="start_time" name="start_time" 
+                                   value="<%= defaultStartTime %>" required>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="end_time" class="form-label">结束时间 <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="end_time" name="end_time" 
+                                   value="<%= defaultEndTime %>" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="purpose" class="form-label">预约用途 <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="purpose" name="purpose" rows="3" 
+                              placeholder="请输入预约用途或事由" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">附件上传</label>
+                    <input type="file" class="form-control" id="attachments" name="attachments" multiple 
+                           accept=".doc,.docx,.pdf,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png">
+                    <div class="form-text">
+                        支持上传的文件格式：Word、Excel、PowerPoint、PDF、图片等，单个文件不超过10MB
+                    </div>
+                    
+                    <div class="attachment-preview" id="attachmentPreview">
+                        <!-- 附件预览将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="/?view=<%= viewType %>&date=<%= baseDate %>" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> 返回日历
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> 确认预约
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script>
+        // 处理文件上传预览
+        const fileInput = document.getElementById('attachments');
+        const previewContainer = document.getElementById('attachmentPreview');
+        
+        fileInput.addEventListener('change', function() {
+            previewContainer.innerHTML = '';
+            
+            if (this.files.length === 0) {
+                previewContainer.innerHTML = '<div class="text-muted">未选择任何文件</div>';
+                return;
+            }
+            
+            for (let i = 0; i < this.files.length; i++) {
+                const file = this.files[i];
+                const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+                
+                const attachmentItem = document.createElement('div');
+                attachmentItem.className = 'attachment-item';
+                
+                const fileIcon = document.createElement('i');
+                fileIcon.className = getFileIconClass(file.name);
+                fileIcon.style.marginRight = '8px';
+                
+                const fileName = document.createElement('div');
+                fileName.className = 'attachment-name';
+                fileName.title = file.name;
+                fileName.textContent = file.name;
+                
+                const fileSizeEl = document.createElement('div');
+                fileSizeEl.className = 'attachment-size text-muted small';
+                fileSizeEl.style.marginRight = '10px';
+                fileSizeEl.textContent = `${fileSize} MB`;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'btn-remove';
+                removeBtn.innerHTML = '<i class="bi bi-x"></i>';
+                removeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // 这里只是从预览中移除，实际移除文件需要更复杂的处理
+                    attachmentItem.remove();
+                    
+                    // 如果没有文件了，显示提示
+                    if (previewContainer.children.length === 0) {
+                        previewContainer.innerHTML = '<div class="text-muted">未选择任何文件</div>';
+                    }
+                });
+                
+                attachmentItem.appendChild(fileIcon);
+                attachmentItem.appendChild(fileName);
+                attachmentItem.appendChild(fileSizeEl);
+                attachmentItem.appendChild(removeBtn);
+                previewContainer.appendChild(attachmentItem);
+            }
+        });
+        
+        // 根据文件名获取对应的图标类
+        function getFileIconClass(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            
+            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                return 'bi bi-image';
+            } else if (['doc', 'docx'].includes(ext)) {
+                return 'bi bi-file-word';
+            } else if (['xls', 'xlsx'].includes(ext)) {
+                return 'bi bi-file-excel';
+            } else if (['ppt', 'pptx'].includes(ext)) {
+                return 'bi bi-file-powerpoint';
+            } else if (ext === 'pdf') {
+                return 'bi bi-file-pdf';
+            } else {
+                return 'bi bi-file';
+            }
+        }
+        
+        // 初始化显示
+        previewContainer.innerHTML = '<div class="text-muted">未选择任何文件</div>';
+        
+        // 简单的时间验证
+        const startTimeInput = document.getElementById('start_time');
+        const endTimeInput = document.getElementById('end_time');
+        
+        document.querySelector('form').addEventListener('submit', function(e) {
+            if (startTimeInput.value && endTimeInput.value && 
+                new Date(startTimeInput.value) >= new Date(endTimeInput.value)) {
+                e.preventDefault();
+                alert('结束时间必须晚于开始时间');
+                return false;
+            }
+        });
+        
+        // 从URL参数自动填充表单
+        document.addEventListener('DOMContentLoaded', function() {
+            // 解析URL参数
+            const params = new URLSearchParams(window.location.search);
+            const equipmentId = params.get('equipment_id');
+            const startHour = params.get('start_hour');
+            const endHour = params.get('end_hour');
+            const date = params.get('date');
+            
+            // 自动选择设备
+            if (equipmentId && document.getElementById('equipment_id')) {
+                const select = document.getElementById('equipment_id');
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].value === equipmentId) {
+                        select.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            // 自动填充时间
+            if (date && startHour) {
+                // 构建开始时间
+                const startTime = `${date}T${startHour.padStart(2, '0')}:00`;
+                if (document.getElementById('start_time')) {
+                    document.getElementById('start_time').value = startTime;
+                }
+                
+                // 构建结束时间
+                if (endHour && document.getElementById('end_time')) {
+                    const endTime = `${date}T${endHour.padStart(2, '0')}:00`;
+                    document.getElementById('end_time').value = endTime;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

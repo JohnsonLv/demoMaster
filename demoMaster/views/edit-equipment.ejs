@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑设备 - 设备预约系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 设备状态样式 */
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .status-available {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-maintenance {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .status-retired {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-unknown {
+            background-color: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+
+        .btn-edit {
+            background-color: #0d6efd;
+            color: white;
+            margin-right: 5px;
+        }
+        
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 - 与设备列表页保持一致 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-calendar-check"></i> 设备预约系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home"></i> 首页
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/equipment">
+                            <i class="fas fa-tools"></i> 设备管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/china-map">
+                            <i class="fas fa-map-marked-alt"></i> 城市地图
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/bookings/new">
+                            <i class="fas fa-plus-circle"></i> 新增预约
+                        </a>
+                    </li>
+                </ul>
+                <div class="navbar-nav">
+                    <span class="nav-item nav-link me-2">
+                        <i class="fas fa-user"></i> <%= user.username %>
+                    </span>
+                    <a class="nav-item nav-link" href="/logout">
+                        <i class="fas fa-sign-out-alt"></i> 退出登录
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>编辑设备</h1>
+            <a href="/equipment" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> 返回设备列表
+            </a>
+        </div>
+
+        <!-- 编辑设备表单 - 使用卡片样式保持一致性 -->
+        <div class="card">
+            <div class="card-header">
+                <h5>设备信息编辑</h5>
+            </div>
+            <div class="card-body">
+                <form action="/equipment/update/<%= equipment.id %>" method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="name" class="form-label">设备名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" value="<%= equipment.name %>" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">设备类型 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="type" name="type" value="<%= equipment.type %>" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="status" class="form-label">设备状态 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="可用" <%= equipment.status === '可用' ? 'selected' : '' %>>可用</option>
+                                <option value="维修中" <%= equipment.status === '维修中' ? 'selected' : '' %>>维修中</option>
+                                <option value="已报废" <%= equipment.status === '已报废' ? 'selected' : '' %>>已报废</option>
+                            </select>
+                        </div>
+                        <!-- 新增地点字段 -->
+                        <div class="col-md-6">
+                            <label for="location" class="form-label">设备地点</label>
+                            <input type="text" class="form-control" id="location" name="location" 
+                                   value="<%= equipment.location || '' %>"
+                                   placeholder="输入设备所在城市或位置（如：上海、南京）">
+                            <div class="form-text">与地图页面中的城市相对应</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="description" class="form-label">设备描述</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"><%= equipment.description || '' %></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-save"></i> 保存修改
+                        </button>
+                        <a href="/equipment" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> 取消
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+    

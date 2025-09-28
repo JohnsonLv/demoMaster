@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备预约系统 - <%= moment(date).format('YYYY年MM月DD日') %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .calendar-container {
+            margin-top: 20px;
+        }
+        .time-slot {
+            border-bottom: 1px solid #eee;
+            height: 60px; /* 每小时60分钟，1px=1分钟 */
+            position: relative;
+        }
+        .time-label {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80px;
+            height: 100%;
+            border-right: 1px solid #ccc;
+            padding: 5px;
+        }
+        .booking-area {
+            margin-left: 80px;
+            height: 100%;
+            display: flex;
+        }
+        .equipment-column {
+            flex: 1;
+            border-right: 1px solid #eee;
+            padding: 5px;
+            position: relative;
+        }
+        .equipment-column:hover {
+            background-color: #f0f7ff;
+        }
+        .equipment-column.selected {
+            background-color: #cce5ff;
+        }
+        .equipment-column.selected-multiple {
+            background-color: #b8daff;
+        }
+        .booking {
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 4px;
+            padding: 3px;
+            margin-bottom: 2px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .booking.continuous {
+            position: absolute;
+            width: calc(100% - 10px);
+            z-index: 10;
+        }
+        .booking:hover {
+            background-color: #0b5ed7;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .add-booking {
+            margin-top: 20px;
+        }
+        .date-nav {
+            margin-bottom: 20px;
+        }
+        .view-buttons .btn {
+            margin-right: 5px;
+        }
+        .view-buttons .btn.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .weekday-header, .day-cell {
+            min-height: 100px;
+            border: 1px solid #eee;
+            padding: 5px;
+        }
+        .weekday-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            text-align: center;
+        }
+        .day-cell {
+            vertical-align: top;
+            min-width: 14%;
+            position: relative;
+        }
+        .day-number {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .other-month {
+            color: #999;
+        }
+        .current-day {
+            background-color: #e7f1ff;
+        }
+        .month-view .booking {
+            font-size: 11px;
+            margin-bottom: 3px;
+            padding: 2px;
+        }
+        /* 右键菜单样式 */
+        .context-menu {
+            position: absolute;
+            width: 180px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 5px 0;
+            z-index: 1000;
+            display: none;
+        }
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .context-menu-item:hover {
+            background-color: #f0f7f9;
+        }
+        .context-menu-divider {
+            height: 1px;
+            background-color: #eee;
+            margin: 5px 0;
+        }
+        /* 月视图网格布局 */
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+        /* 批量选择提示 */
+        .selection-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 900;
+            display: none;
+        }
+        /* 选择错误提示 */
+        .selection-error {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 900;
+            display: none;
+        }
+        /* 预约详情模态框 */
+        .modal-backdrop {
+            z-index: 1040;
+        }
+        .modal {
+            z-index: 1050;
+        }
+        .booking-details h5 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .detail-item {
+            margin-bottom: 10px;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #666;
+        }
+        /* 时间刻度线 */
+        .time-marker {
+            position: absolute;
+            left: 80px;
+            right: 0;
+            height: 1px;
+            background-color: #ddd;
+            z-index: 1;
+        }
+        .time-marker-30 {
+            top: 30px; /* 30分钟位置 */
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 
+    <%= include('partials/navbar', { currentPage: 'home', user: user }) %> -->
+<!-- 导航栏组件 -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-calendar-check"></i> 设备预约系统
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-home"></i> 首页
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/equipment">
+                        <i class="fas fa-tools"></i> 设备管理
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/china-map">
+                        <i class="fas fa-map-marked-alt"></i> 城市地图
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/bookings/new">
+                        <i class="fas fa-plus-circle"></i> 新增预约
+                    </a>
+                </li>
+            </ul>
+            <div class="navbar-nav">
+                <span class="nav-item nav-link me-2">
+                    <i class="fas fa-user"></i> <%= user.username %>
+                </span>
+                <a class="nav-item nav-link" href="/logout">
+                    <i class="fas fa-sign-out-alt"></i> 退出登录
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+
+    <div class="container calendar-container">
+        <div class="date-nav d-flex justify-content-between align-items-center flex-wrap">
+            <h1>设备预约日历</h1>
+            <div class="d-flex align-items-center">
+                <div class="view-buttons me-3">
+                    <a href="/?view=day&date=<%= baseDate %>" class="btn btn-sm <%= viewType === 'day' ? 'btn-primary' : 'btn-secondary' %>">日视图</a>
+                    <a href="/?view=week&date=<%= baseDate %>" class="btn btn-sm <%= viewType === 'week' ? 'btn-primary' : 'btn-secondary' %>">周视图</a>
+                    <a href="/?view=month&date=<%= baseDate %>" class="btn btn-sm <%= viewType === 'month' ? 'btn-primary' : 'btn-secondary' %>">月视图</a>
+                </div>
+                <div class="date-controls">
+                    <a href="/?view=<%= viewType %>&date=<%= prevDate %>" class="btn btn-secondary btn-sm">前</a>
+                    <span class="mx-3 fs-5"><%= displayDate %></span>
+                    <a href="/?view=<%= viewType %>&date=<%= nextDate %>" class="btn btn-secondary btn-sm">后</a>
+                    <a href="/bookings/new?view=<%= viewType %>&date=<%= baseDate %>" class="btn btn-primary btn-sm ms-3">
+                        <i class="fas fa-plus"></i> 添加新预约
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右键菜单 -->
+        <div id="contextMenu" class="context-menu">
+            <div class="context-menu-item" id="addSingleBooking">
+                <i class="fas fa-calendar-plus"></i> 添加单个预约
+            </div>
+            <div class="context-menu-item" id="addMultipleBookings">
+                <i class="fas fa-calendar-check"></i> 添加选中的预约
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" id="clearSelection">
+                <i class="fas fa-eraser"></i> 清除选择
+            </div>
+            <div class="context-menu-item" id="closeMenu">
+                <i class="fas fa-times"></i> 关闭
+            </div>
+        </div>
+
+        <!-- 选择提示 -->
+        <div id="selectionHint" class="selection-hint">
+            <i class="fas fa-info-circle"></i> 按住Ctrl键选择同一设备的多个时间段，右键完成操作
+        </div>
+        
+        <!-- 选择错误提示 -->
+        <div id="selectionError" class="selection-error">
+            <i class="fas fa-exclamation-circle"></i> 只能选择同一设备的时间段
+        </div>
+
+        <!-- 预约详情模态框 -->
+        <div class="modal fade" id="bookingDetailModal" tabindex="-1" aria-labelledby="bookingDetailModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bookingDetailModalLabel">预约详情</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body booking-details">
+                        <div class="detail-item">
+                            <span class="detail-label">预约ID：</span>
+                            <span id="bookingId"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">设备名称：</span>
+                            <span id="equipmentName"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">预约人：</span>
+                            <span id="userName"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">预约时间：</span>
+                            <span id="bookingTime"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">用途：</span>
+                            <span id="bookingPurpose"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">联系方式：</span>
+                            <span id="contactInfo"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">状态：</span>
+                            <span id="bookingStatus"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">创建时间：</span>
+                            <span id="createTime"></span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <a href="" id="editBookingLink" class="btn btn-primary">编辑预约</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日视图 -->
+        <% if (viewType === 'day') { %>
+            <div class="calendar-grid">
+                <!-- 设备列标题 -->
+                <div class="time-slot">
+                    <div class="time-label"></div>
+                    <div class="booking-area">
+                        <% equipment.forEach(equip => { %>
+                            <div class="equipment-column">
+                                <strong><%= equip.name %></strong>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+
+                <!-- 时间段行 (从9点到18点) -->
+                <% for (let hour = 9; hour < 18; hour++) { %>
+                    <div class="time-slot">
+                        <!-- 30分钟刻度线 -->
+                        <div class="time-marker time-marker-30"></div>
+                        
+                        <div class="time-label">
+                            <%= hour %>:00 - <%= hour + 1 %>:00
+                        </div>
+                        <div class="booking-area">
+                            <% equipment.forEach(equip => { %>
+                                <div class="equipment-column selectable" 
+                                     data-equipment-id="<%= equip.id %>"
+                                     data-equipment-name="<%= equip.name %>"
+                                     data-hour="<%= hour %>"
+                                     data-date="<%= date %>">
+                                    <% 
+                                    // 查找当前设备的所有预约
+                                    const equipBookings = bookings.filter(booking => 
+                                        booking.equipment_id === equip.id
+                                    );
+                                    
+                                    // 标记已处理的预约
+                                    const processedBookings = new Set();
+                                    %>
+                                    
+                                    <% // 处理所有预约，包括连续和非连续的 %>
+                                    <% equipBookings.forEach(booking => { %>
+                                        <% 
+                                        if (processedBookings.has(booking.id)) return;
+                                        
+                                        const start = moment(booking.start_time);
+                                        const end = moment(booking.end_time);
+                                        
+                                        // 计算预约在当前小时槽中的位置和高度
+                                        const startHour = start.hour();
+                                        const endHour = end.hour();
+                                        const startMinute = start.minute();
+                                        const endMinute = end.minute();
+                                        
+                                        // 计算总持续时间（分钟）
+                                        const durationMinutes = end.diff(start, 'minutes');
+                                        
+                                        // 计算在当前小时槽中的顶部偏移量
+                                        const topOffset = startHour === hour ? startMinute : 0;
+                                        
+                                        // 只在预约开始的小时槽中创建元素
+                                        if (startHour === hour) {
+                                        %>
+                                            <div class="booking continuous" 
+                                                 data-booking-id="<%= booking.id %>"
+                                                 style="top: <%= topOffset %>px; 
+                                                        height: <%= durationMinutes %>px;"
+                                                 title="用途: <%= booking.purpose || '未填写' %>">
+                                                <%= booking.user_name %>
+                                                <br>
+                                                <%= start.format('HH:mm') %>-<%= end.format('HH:mm') %>
+                                                <a href="/bookings/delete/<%= booking.id %>?view=<%= viewType %>&date=<%= date %>" class="text-white small">删除</a>
+                                            </div>
+                                            <% processedBookings.add(booking.id); %>
+                                        <% } %>
+                                    <% }) %>
+                                </div>
+                            <% }) %>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        <% } %>
+
+        <!-- 周视图 -->
+        <% if (viewType === 'week') { %>
+            <!-- 周视图内容 -->
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">时间</th>
+                            <% 
+                            // 生成一周的日期标题
+                            let day = startDate.clone();
+                            for (let i = 0; i < 7; i++) { 
+                                const isToday = day.isSame(moment(), 'day');
+                                const dateStr = day.format('YYYY-MM-DD');
+                            %>
+                                <th class="text-center <%= isToday ? 'table-primary' : '' %>">
+                                    <%= day.format('MM-DD') %><br>
+                                    <%= ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][day.day()] %>
+                                </th>
+                                <% day.add(1, 'day'); %>
+                            <% } %>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% 
+                        // 生成一天中的时间段（9:00-18:00）
+                        for (let hour = 9; hour < 18; hour++) { 
+                            const timeRange = `${hour}:00 - ${hour+1}:00`;
+                        %>
+                            <tr style="height: 60px;">  <!-- 每小时60分钟，1px=1分钟 -->
+                                <td><%= timeRange %></td>
+                                <% 
+                                // 重置日期到本周开始
+                                let currentDay = startDate.clone();
+                                for (let i = 0; i < 7; i++) { 
+                                    const currentDateStr = currentDay.format('YYYY-MM-DD');
+                                    
+                                    // 按设备分组获取当前日期的所有预约
+                                    const bookingsByEquipment = {};
+                                    equipment.forEach(equip => {
+                                        const equipBookings = bookings.filter(booking => 
+                                            booking.equipment_id === equip.id &&
+                                            moment(booking.start_time).format('YYYY-MM-DD') === currentDateStr
+                                        );
+                                        
+                                        if (equipBookings.length > 0) {
+                                            bookingsByEquipment[equip.id] = {
+                                                id: equip.id,
+                                                name: equip.name,
+                                                bookings: equipBookings
+                                            };
+                                        }
+                                    });
+                                    
+                                    // 处理连续预约
+                                    const processedBookings = new Set();
+                                    const equipmentBookings = Object.values(bookingsByEquipment);
+                                    
+                                    // 为每个设备识别预约
+                                    equipmentBookings.forEach(equip => {
+                                        equip.bookings.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+                                    });
+                                %>
+                                    <td class="context-menu-target selectable"
+                                        data-date="<%= currentDateStr %>"
+                                        data-hour="<%= hour %>"
+                                        style="position: relative; vertical-align: top;">
+                                        
+                                        <% if (equipmentBookings.length > 0) { %>
+                                            <div style="position: relative; z-index: 1; height: 100%;">
+                                                <% equipmentBookings.forEach(equip => { %>
+                                                    <% equip.bookings.forEach(booking => { %>
+                                                        <% 
+                                                        if (processedBookings.has(booking.id)) return;
+                                                        
+                                                        const start = moment(booking.start_time);
+                                                        const end = moment(booking.end_time);
+                                                        const startHour = start.hour();
+                                                        const endHour = end.hour();
+                                                        const startMinute = start.minute();
+                                                        
+                                                        // 计算持续时间（分钟）
+                                                        const durationMinutes = end.diff(start, 'minutes');
+                                                        
+                                                        // 只在预约开始的小时显示元素
+                                                        if (startHour === hour) {
+                                                            // 计算设备列的宽度百分比
+                                                            const columnWidth = 100 / equipmentBookings.length;
+                                                            const leftOffset = equipmentBookings.indexOf(equip) * columnWidth;
+                                                        %>
+                                                            <div class="booking continuous" 
+                                                                 data-booking-id="<%= booking.id %>"
+                                                                 style="position: absolute;
+                                                                        width: calc(<%= columnWidth %>% - 8px);
+                                                                        left: <%= leftOffset %>%;
+                                                                        top: <%= startMinute %>px;
+                                                                        height: <%= durationMinutes %>px;
+                                                                        margin: 0 4px;
+                                                                        padding: 3px;
+                                                                        font-size: 11px;">
+                                                                    <small class="d-block mb-1"><%= equip.name %></small>
+                                                                    <%= booking.user_name %>
+                                                                    <br>
+                                                                    <%= start.format('HH:mm') %>-<%= end.format('HH:mm') %>
+                                                                    <a href="/bookings/delete/<%= booking.id %>?view=<%= viewType %>&date=<%= currentDateStr %>" class="text-white small">删除</a>
+                                                            </div>
+                                                            <% processedBookings.add(booking.id); %>
+                                                        <% } %>
+                                                    <% }) %>
+                                                <% }) %>
+                                            </div>
+                                        <% } %>
+                                    </td>
+                                    <% currentDay.add(1, 'day'); %>
+                                <% } %>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+
+        <!-- 月视图 -->
+        <% if (viewType === 'month') { %>
+            <!-- 月视图内容保持不变 -->
+            <div class="month-view">
+                <div class="month-grid">
+                    <!-- 星期标题 -->
+                    <% ['周日', '周一', '周二', '周三', '周四', '周五', '周六'].forEach(weekday => { %>
+                        <div class="weekday-header"><%= weekday %></div>
+                    <% }) %>
+
+                    <% 
+                    // 计算月份第一天是星期几（0-6，0是周日）
+                    const firstDayOfMonth = startDate.clone();
+                    const firstDayWeekday = firstDayOfMonth.day();
+                    
+                    // 添加上个月的日期填充
+                    for (let i = 0; i < firstDayWeekday; i++) {
+                        const day = firstDayOfMonth.clone().subtract(firstDayWeekday - i, 'days');
+                        const isToday = day.isSame(moment(), 'day');
+                    %>
+                        <div class="day-cell other-month <%= isToday ? 'current-day' : '' %>">
+                            <div class="day-number"><%= day.date() %></div>
+                        </div>
+                    <% } %>
+
+                    <!-- 添加当月的日期 -->
+                    <% 
+                    const daysInMonth = endDate.date();
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const currentDate = startDate.clone().date(day);
+                        const dayStr = currentDate.format('YYYY-MM-DD');
+                        const isToday = currentDate.isSame(moment(), 'day');
+                        
+                        // 筛选当天的所有预约
+                        const dailyBookings = bookings.filter(booking => 
+                            moment(booking.start_time).format('YYYY-MM-DD') === dayStr
+                        );
+                    %>
+                        <div class="day-cell <%= isToday ? 'current-day' : '' %> context-menu-target selectable"
+                             data-date="<%= dayStr %>">
+                            <div class="day-number"><%= day %></div>
+                            
+                            <% if (dailyBookings.length > 0) { %>
+                                <% 
+                                // 按设备分组显示预约
+                                const bookingsByEquipment = {};
+                                dailyBookings.forEach(booking => {
+                                    const equip = equipment.find(e => e.id === booking.equipment_id);
+                                    const equipName = equip ? equip.name : '未知设备';
+                                    
+                                    if (!bookingsByEquipment[equipName]) {
+                                        bookingsByEquipment[equipName] = [];
+                                    }
+                                    bookingsByEquipment[equipName].push(booking);
+                                });
+                                %>
+                                
+                                <% Object.keys(bookingsByEquipment).forEach(equipName => { %>
+                                    <div class="mb-1"><small><%= equipName %></small></div>
+                                    <% bookingsByEquipment[equipName].forEach(booking => { %>
+                                        <div class="booking" 
+                                             data-booking-id="<%= booking.id %>"
+                                             title="设备: <%= equipName %> 用途: <%= booking.purpose || '未填写' %>">
+                                            <%= booking.user_name %>
+                                            <br>
+                                            <%= moment(booking.start_time).format('HH:mm') %>-<%= moment(booking.end_time).format('HH:mm') %>
+                                            <a href="/bookings/delete/<%= booking.id %>?view=<%= viewType %>&date=<%= dayStr %>" class="text-white small">删除</a>
+                                        </div>
+                                    <% }) %>
+                                <% }) %>
+                            <% } else { %>
+                                <div class="no-bookings">无预约</div>
+                            <% } %>
+                        </div>
+                        
+                        <% currentDate.add(1, 'day'); %>
+                    <% } %>
+
+                    <!-- 添加下个月的日期填充 -->
+                    <% 
+                    const lastDayOfMonth = endDate.clone();
+                    const lastDayWeekday = lastDayOfMonth.day(); // 0-6，0是周日
+                    const daysToFill = 6 - lastDayWeekday; // 需要填充的天数
+                    
+                    for (let i = 1; i <= daysToFill; i++) {
+                        const nextDate = lastDayOfMonth.clone().add(i, 'days');
+                        const isToday = nextDate.isSame(moment(), 'day');
+                    %>
+                        <div class="day-cell other-month <%= isToday ? 'current-day' : '' %>">
+                            <div class="day-number"><%= nextDate.date() %></div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        <% } %>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const contextMenu = document.getElementById('contextMenu');
+            const addSingleBookingItem = document.getElementById('addSingleBooking');
+            const addMultipleBookingsItem = document.getElementById('addMultipleBookings');
+            const clearSelectionItem = document.getElementById('clearSelection');
+            const closeMenuItem = document.getElementById('closeMenu');
+            const selectionHint = document.getElementById('selectionHint');
+            const selectionError = document.getElementById('selectionError');
+            const bookingDetailModal = new bootstrap.Modal(document.getElementById('bookingDetailModal'));
+            
+            let clickedElement = null;
+            let firstSelectedElement = null;
+            let selectedElements = [];
+            let currentEquipmentId = null;
+            let isCtrlPressed = false;
+            
+            // 显示错误提示
+            function showSelectionError() {
+                selectionError.style.display = 'block';
+                setTimeout(() => {
+                    selectionError.style.opacity = '0';
+                    setTimeout(() => {
+                        selectionError.style.display = 'none';
+                        selectionError.style.opacity = '1';
+                    }, 300);
+                }, 2000);
+            }
+            
+            // 显示选择提示
+            function showSelectionHint() {
+                selectionHint.style.display = 'block';
+                setTimeout(() => {
+                    selectionHint.style.opacity = '0';
+                    setTimeout(() => {
+                        selectionHint.style.display = 'none';
+                        selectionHint.style.opacity = '1';
+                    }, 300);
+                }, 3000);
+            }
+            
+            // 处理Ctrl键按下和释放
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Control') {
+                    isCtrlPressed = true;
+                    if (selectedElements.length > 0) {
+                        showSelectionHint();
+                    }
+                }
+            });
+            
+            document.addEventListener('keyup', function(e) {
+                if (e.key === 'Control') {
+                    isCtrlPressed = false;
+                }
+            });
+            
+            // 清除所有选择
+            function clearSelection() {
+                selectedElements.forEach(el => {
+                    el.classList.remove('selected', 'selected-multiple');
+                });
+                selectedElements = [];
+                firstSelectedElement = null;
+                currentEquipmentId = null;
+            }
+            
+            // 选择单个元素
+            function selectElement(el) {
+                const elementEquipId = el.dataset.equipmentId;
+                
+                if (!elementEquipId) {
+                    if (!isCtrlPressed) {
+                        clearSelection();
+                        selectedElements.push(el);
+                        el.classList.add('selected');
+                        firstSelectedElement = el;
+                    }
+                    return;
+                }
+                
+                const index = selectedElements.indexOf(el);
+                if (index > -1) {
+                    selectedElements.splice(index, 1);
+                    el.classList.remove('selected', 'selected-multiple');
+                    if (firstSelectedElement === el) {
+                        firstSelectedElement = selectedElements.length > 0 ? selectedElements[0] : null;
+                        currentEquipmentId = firstSelectedElement ? firstSelectedElement.dataset.equipmentId : null;
+                    }
+                    return;
+                }
+                
+                if (!isCtrlPressed || selectedElements.length === 0) {
+                    clearSelection();
+                    currentEquipmentId = elementEquipId;
+                    firstSelectedElement = el;
+                    selectedElements.push(el);
+                    el.classList.add('selected');
+                } else if (isCtrlPressed && currentEquipmentId) {
+                    if (elementEquipId !== currentEquipmentId) {
+                        showSelectionError();
+                        return;
+                    }
+                    
+                    const date = el.dataset.date || firstSelectedElement.dataset.date;
+                    const sameEquipAndDateSelector = `.equipment-column.selectable[data-equipment-id="${currentEquipmentId}"][data-date="${date}"]`;
+                    const sameElements = Array.from(document.querySelectorAll(sameEquipAndDateSelector));
+                    
+                    if (sameElements.length > 0) {
+                        const firstIndex = sameElements.indexOf(firstSelectedElement);
+                        const currentIndex = sameElements.indexOf(el);
+                        
+                        if (firstIndex > -1 && currentIndex > -1) {
+                            const startIndex = Math.min(firstIndex, currentIndex);
+                            const endIndex = Math.max(firstIndex, currentIndex);
+                            
+                            clearSelection();
+                            currentEquipmentId = elementEquipId;
+                            for (let i = startIndex; i <= endIndex; i++) {
+                                const elementToSelect = sameElements[i];
+                                selectedElements.push(elementToSelect);
+                                elementToSelect.classList.add('selected-multiple');
+                            }
+                            firstSelectedElement = sameElements[startIndex];
+                        }
+                    }
+                }
+            }
+            
+            // 点击选择元素
+            document.addEventListener('click', function(e) {
+                // 如果点击的是预约块，显示详情
+                const bookingElement = e.target.closest('.booking');
+                if (bookingElement && !e.target.closest('a')) {
+                    e.preventDefault();
+                    const bookingId = bookingElement.dataset.bookingId;
+                    loadBookingDetails(bookingId);
+                    return;
+                }
+                
+                const targetElement = e.target.closest('.equipment-column.selectable, .context-menu-target.selectable, .day-cell:not(.other-month).selectable');
+                if (targetElement) {
+                    e.preventDefault();
+                    selectElement(targetElement);
+                } else if (!contextMenu.contains(e.target)) {
+                    clearSelection();
+                    contextMenu.style.display = 'none';
+                    clickedElement = null;
+                }
+            });
+            
+            // 从数据库加载预约详情
+            function loadBookingDetails(bookingId) {
+                // 从服务器API获取预约详情
+                fetch(`/bookings/details/${bookingId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('获取预约详情失败');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data.success) {
+                            throw new Error(data.message || '获取预约详情失败');
+                        }
+                        
+                        const booking = data.data.booking;
+                        const equipment = data.data.equipment;
+                        
+                        // 填充模态框数据
+                        document.getElementById('bookingId').textContent = booking.id;
+                        document.getElementById('equipmentName').textContent = equipment ? equipment.name : '未知设备';
+                        document.getElementById('userName').textContent = booking.user_name;
+                        document.getElementById('bookingTime').textContent = 
+                            `${booking.start_time_formatted} - ${booking.end_time_formatted.split(' ')[1]}`;
+                        document.getElementById('bookingPurpose').textContent = booking.purpose || '未填写';
+                        document.getElementById('contactInfo').textContent = booking.contact || '未填写';
+                        document.getElementById('bookingStatus').textContent = '已确认'; // 可根据实际数据调整
+                        document.getElementById('createTime').textContent = booking.created_at_formatted;
+                        
+                        // 更新编辑链接
+                        document.getElementById('editBookingLink').href = `/bookings/edit/${booking.id}?view=<%= viewType %>&date=<%= baseDate %>`;
+                        
+                        // 显示模态框
+                        bookingDetailModal.show();
+                    })
+                    .catch(error => {
+                        console.error('加载预约详情出错:', error);
+                        alert('无法加载预约详情，请重试');
+                    });
+            }
+            
+            // 右键菜单相关代码
+            document.addEventListener('contextmenu', function(e) {
+                const targetElement = e.target.closest('.equipment-column.selectable, .context-menu-target.selectable, .day-cell:not(.other-month).selectable');
+                if (targetElement && !e.target.closest('.booking')) {
+                    e.preventDefault();
+                    clickedElement = targetElement;
+                    
+                    if (selectedElements.length === 0) {
+                        selectElement(targetElement);
+                    }
+                    
+                    addMultipleBookingsItem.style.display = selectedElements.length > 1 ? 'block' : 'none';
+                    if (selectedElements.length > 1) {
+                        addMultipleBookingsItem.style.display = 'block';
+                        addSingleBookingItem.style.display = 'none';
+                    } else {
+                        addMultipleBookingsItem.style.display = 'none';
+                        addSingleBookingItem.style.display = 'block';
+                    }
+                    
+                    const x = e.pageX;
+                    const y = e.pageY;
+                    
+                    contextMenu.style.left = `${x}px`;
+                    contextMenu.style.top = `${y}px`;
+                    contextMenu.style.display = 'block';
+                    
+                    const menuWidth = contextMenu.offsetWidth;
+                    const menuHeight = contextMenu.offsetHeight;
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+                    
+                    if (x + menuWidth > viewportWidth) {
+                        contextMenu.style.left = `${x - menuWidth}px`;
+                    }
+                    
+                    if (y + menuHeight > viewportHeight) {
+                        contextMenu.style.top = `${y - menuHeight}px`;
+                    }
+                }
+            });
+            
+            // 关闭菜单
+            closeMenuItem.addEventListener('click', function() {
+                contextMenu.style.display = 'none';
+                clickedElement = null;
+            });
+            
+            // 清除选择
+            clearSelectionItem.addEventListener('click', function() {
+                clearSelection();
+                contextMenu.style.display = 'none';
+                clickedElement = null;
+            });
+            
+            // 添加单个预约
+            addSingleBookingItem.addEventListener('click', function() {
+                if (!clickedElement) return;
+                
+                const date = clickedElement.dataset.date || '<%= baseDate %>';
+                const hour = clickedElement.dataset.hour || 9;
+                const equipmentId = clickedElement.dataset.equipmentId || '';
+                
+                const endHour = parseInt(hour) + 1;
+                
+                let url = `/bookings/new?view=<%= viewType %>&date=${date}&start_hour=${hour}&end_hour=${endHour}`;
+                if (equipmentId) {
+                    url += `&equipment_id=${equipmentId}`;
+                }
+                
+                window.location.href = url;
+            });
+            
+            // 添加多个预约（连续时间段）
+            addMultipleBookingsItem.addEventListener('click', function() {
+                if (selectedElements.length < 2) return;
+                
+                selectedElements.sort((a, b) => {
+                    const hourA = parseInt(a.dataset.hour || 0);
+                    const hourB = parseInt(b.dataset.hour || 0);
+                    return hourA - hourB;
+                });
+                
+                const firstEl = selectedElements[0];
+                const lastEl = selectedElements[selectedElements.length - 1];
+                
+                const date = firstEl.dataset.date || '<%= baseDate %>';
+                const startHour = firstEl.dataset.hour || 9;
+                const endHour = parseInt(lastEl.dataset.hour || 9) + 1;
+                const equipmentId = firstEl.dataset.equipmentId || '';
+                
+                let url = `/bookings/new?view=<%= viewType %>&date=${date}&start_hour=${startHour}&end_hour=${endHour}`;
+                if (equipmentId) {
+                    url += `&equipment_id=${equipmentId}`;
+                }
+                
+                window.location.href = url;
+            });
+            
+            // 按ESC键关闭菜单和清除选择
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    contextMenu.style.display = 'none';
+                    clickedElement = null;
+                    clearSelection();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
